@@ -1,75 +1,291 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-TW">
-<head>
-  <meta charset="UTF-8">
-  <title>匿名留言板</title>
-  <style>
-    body { font-family: sans-serif; background: #121212; color: #fff; max-width: 600px; margin: 40px auto; padding: 20px; }
-    .card, .post { background: #1e1e1e; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
-    input, textarea, button { width: 100%; padding: 10px; margin-top: 8px; background: #2a2a2a; border: 1px solid #444; color: #fff; border-radius: 4px; box-sizing: border-box; }
-    button { background: #4caf50; font-weight: bold; cursor: pointer; border: none; }
-    button:hover { background: #45a049; }
-    .post-header { display: flex; justify-content: space-between; font-size: 0.8em; color: #aaa; margin-bottom: 5px; }
-    .name { color: #81c784; font-weight: bold; }
-  </style>
-</head>
-<body>
-  <h1>💬 匿名留言板</h1>
-
-  <div class="card">
-    <input type="text" id="nickname" placeholder="你的暱稱 (選填)">
-    <textarea id="content" rows="3" placeholder="說點什麼吧..."></textarea>
-    <button onclick="sendPost()">發布留言</button>
-  </div>
-
-  <div id="postsList">載入中...</div>
-
-  <script>
-    loadPosts();
-
-    async function loadPosts() {
-      const res = await fetch('/api/posts');
-      const posts = await res.json();
-      const list = document.getElementById('postsList');
-      
-      if(posts.length === 0) {
-        list.innerHTML = '<p style="text-align:center;color:#777">目前沒有留言</p>';
-        return;
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>✨ 匿名留言板</title>
+    <style>
+      /* 全局樣式設計 */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        background: #0d1117;
+        color: #c9d1d9;
+        max-width: 680px;
+        margin: 40px auto;
+        padding: 0 20px;
       }
 
-      list.innerHTML = posts.map(p => `
+      h1 {
+        text-align: center;
+        margin-bottom: 24px;
+        color: #58a6ff;
+        font-size: 2rem;
+      }
+
+      /* 發布框與卡片 */
+      .card {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 24px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+
+      input,
+      textarea {
+        width: 100%;
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 10px 14px;
+        color: #c9d1d9;
+        font-size: 14px;
+        margin-bottom: 12px;
+        transition: border-color 0.2s;
+      }
+
+      input:focus,
+      textarea:focus {
+        outline: none;
+        border-color: #58a6ff;
+      }
+
+      /* 按鈕樣式 */
+      .btn {
+        background: #238636;
+        color: #ffffff;
+        border: none;
+        padding: 10px 18px;
+        font-weight: 600;
+        border-radius: 6px;
+        cursor: pointer;
+        width: 100%;
+        transition: background 0.2s;
+      }
+
+      .btn:hover {
+        background: #2ea043;
+      }
+
+      /* 留言列表樣式 */
+      .post {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 16px;
+        position: relative;
+      }
+
+      .post-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+
+      .nickname {
+        font-weight: bold;
+        color: #79c0ff;
+      }
+
+      .post-content {
+        color: #e6edf3;
+        line-height: 1.6;
+        margin-bottom: 12px;
+        white-space: pre-wrap;
+      }
+
+      .post-actions {
+        display: flex;
+        gap: 10px;
+      }
+
+      .action-btn {
+        background: #21262d;
+        border: 1px solid #30363d;
+        color: #8b949e;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .action-btn:hover {
+        background: #30363d;
+        color: #c9d1d9;
+      }
+
+      .delete-btn:hover {
+        background: rgba(248, 81, 73, 0.15);
+        color: #f85149;
+        border-color: #f85149;
+      }
+
+      .empty-state {
+        text-align: center;
+        color: #8b949e;
+        padding: 40px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>💬 匿名留言板</h1>
+
+    <!-- 發布留言卡片 -->
+    <div class="card">
+      <input
+        type="text"
+        id="nickname"
+        placeholder="暱稱（預設：熱心匿名人士）"
+      />
+      <textarea id="content" rows="3" placeholder="在想些什麼呢..."></textarea>
+      <button class="btn" onclick="sendPost()">發布留言</button>
+    </div>
+
+    <!-- 留言清單區塊 -->
+    <div id="postsList">
+      <div class="empty-state">載入留言中...</div>
+    </div>
+
+    <script>
+      // 當頁面載入完成時，自動抓取所有留言
+      loadPosts();
+
+      // 1. GET 抓取所有留言
+      async function loadPosts() {
+        try {
+          const response = await fetch("http://localhost:3000/api/posts");
+          const result = await response.json();
+          // 確保相容 { success: true, data: [...] } 或單純 [...] 格式
+          const posts = result.data || result;
+          renderPosts(posts);
+        } catch (err) {
+          console.error("抓取失敗:", err);
+          document.getElementById("postsList").innerHTML =
+            '<div class="empty-state">無法連線到伺服器</div>';
+        }
+      }
+
+      // 2. 渲染 (Render) 留言到網頁畫面上
+      function renderPosts(posts) {
+        const container = document.getElementById("postsList");
+
+        if (!posts || posts.length === 0) {
+          container.innerHTML =
+            '<div class="empty-state">目前還沒有任何留言，快來搶頭香！</div>';
+          return;
+        }
+
+        // 將留言陣列倒序顯示（最新的在最上面）
+        container.innerHTML = posts
+          .slice()
+          .reverse()
+          .map(
+            (post) => `
         <div class="post">
           <div class="post-header">
-            <span class="name">${escapeHtml(p.nickname)}</span>
-            <span>${new Date(p.createdAt).toLocaleString()}</span>
+            <span class="nickname">${escapeHtml(post.nickname)}</span>
           </div>
-          <div>${escapeHtml(p.content)}</div>
+          <div class="post-content">${escapeHtml(post.content)}</div>
+          <div class="post-actions">
+            <button class="action-btn" onclick="likePost(${post.id})">
+              ❤️ 按讚 (${post.likes || 0})
+            </button>
+            <button class="action-btn delete-btn" onclick="deletePost(${post.id})">
+              🗑️ 刪除
+            </button>
+          </div>
         </div>
-      `).join('');
-    }
-
-    async function sendPost() {
-      const nickname = document.getElementById('nickname').value;
-      const content = document.getElementById('content').value;
-
-      if (!content.trim()) {
-        alert('請輸入留言內容！');
-        return;
+      `,
+          )
+          .join("");
       }
 
-      await fetch('/api/posts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nickname, content })
-      });
+      // 3. POST 新增留言
+      async function sendPost() {
+        const nicknameInput = document.getElementById("nickname");
+        const contentInput = document.getElementById("content");
 
-      document.getElementById('content').value = '';
-      loadPosts();
-    }
+        const nickname = nicknameInput.value.trim();
+        const content = contentInput.value.trim();
 
-    function escapeHtml(str) {
-      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    }
-  </script>
-</body>
+        if (!content) {
+          alert("請輸入留言內容！");
+          return;
+        }
+
+        try {
+          const response = await fetch("http://localhost:3000/api/posts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nickname, content }),
+          });
+
+          if (response.ok) {
+            contentInput.value = ""; // 清空輸入框
+            loadPosts(); // 重新整理列表
+          } else {
+            alert("發布失敗，請再試一次");
+          }
+        } catch (err) {
+          alert("發生錯誤，無法發布留言");
+        }
+      }
+
+      // 4. POST 按讚功能
+      async function likePost(id) {
+        try {
+          const response = await fetch(
+            `http://localhost:3000/api/posts/${id}/like`,
+            { method: "POST" },
+          );
+          if (response.ok) {
+            loadPosts(); // 重新讀取，顯示最新按讚數
+          }
+        } catch (err) {
+          console.error("按讚失敗:", err);
+        }
+      }
+
+      // 5. DELETE 刪除功能
+      async function deletePost(id) {
+        if (!confirm("確定要刪除這條留言嗎？")) return;
+
+        try {
+          const response = await fetch(
+            `http://localhost:3000/api/posts/${id}`,
+            { method: "DELETE" },
+          );
+          if (response.ok) {
+            loadPosts(); // 重新讀取列表
+          } else {
+            alert("刪除失敗！");
+          }
+        } catch (err) {
+          console.error("刪除失敗:", err);
+        }
+      }
+
+      // 防範 XSS 攻擊的字串處理
+      function escapeHtml(str) {
+        if (!str) return "";
+        return str
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+    </script>
+  </body>
 </html>
